@@ -1,0 +1,12 @@
+build/
+_ghidra_temp/
+.desloppify/
+.serena/
+
+*.log
+*.dmp
+MHModern_crashes/
+
+__pycache__/
+*.py[cod]
+
