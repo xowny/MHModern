@@ -16,7 +16,10 @@ uint64_t counter_to_milliseconds(int64_t counter_delta, int64_t frequency) {
         return 0;
     }
 
-    return static_cast<uint64_t>((counter_delta * 1000) / frequency);
+    const auto whole_seconds = counter_delta / frequency;
+    const auto remaining_counts = counter_delta % frequency;
+    return static_cast<uint64_t>(whole_seconds) * 1000ull +
+        (static_cast<uint64_t>(remaining_counts) * 1000ull) / static_cast<uint64_t>(frequency);
 }
 
 uint32_t wrap_milliseconds(uint64_t milliseconds) {

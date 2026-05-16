@@ -33,74 +33,93 @@ std::filesystem::path exe_directory() {
     return std::filesystem::path(buffer).parent_path();
 }
 
+bool read_ini_bool(const char* section, const char* key, bool default_value, const std::filesystem::path& ini_path) {
+    return GetPrivateProfileIntA(
+               section,
+               key,
+               default_value ? 1 : 0,
+               ini_path.string().c_str()) != 0;
+}
+
+std::uint32_t read_ini_u32_in_range(
+    const char* section,
+    const char* key,
+    std::uint32_t default_value,
+    std::uint32_t min_value,
+    std::uint32_t max_value,
+    const std::filesystem::path& ini_path) {
+    const UINT raw = GetPrivateProfileIntA(
+        section,
+        key,
+        static_cast<int>(default_value),
+        ini_path.string().c_str());
+    if (raw < min_value || raw > max_value) {
+        return default_value;
+    }
+
+    return raw;
+}
+
+std::int32_t read_ini_audio_bits(const std::filesystem::path& ini_path) {
+    const auto raw = static_cast<std::int32_t>(
+        GetPrivateProfileIntA("Main", "MilesFallbackBits", 16, ini_path.string().c_str()));
+    switch (raw) {
+    case 8:
+    case 16:
+    case 24:
+    case 32:
+        return raw;
+    default:
+        return 16;
+    }
+}
+
+std::int32_t read_ini_audio_channels(const std::filesystem::path& ini_path) {
+    const auto raw = static_cast<std::int32_t>(
+        GetPrivateProfileIntA("Main", "MilesFallbackChannels", 2, ini_path.string().c_str()));
+    return raw == 1 ? 1 : (raw == 2 ? 2 : 2);
+}
+
 }  // namespace
 
 namespace mhmodern::modern_patch::detail {
 
 Settings load_settings_from(const std::filesystem::path& ini_path) {
     Settings settings{};
-    settings.miles_audio_patch =
-        GetPrivateProfileIntA("Main", "EnableMilesAudioPatch", 1, ini_path.string().c_str()) != 0;
-    settings.log_audio_init =
-        GetPrivateProfileIntA("Main", "LogMilesAudioInit", 0, ini_path.string().c_str()) != 0;
-    settings.detect_miles_primary_format =
-        GetPrivateProfileIntA("Main", "DetectMilesPrimaryFormat", 1, ini_path.string().c_str()) != 0;
-    settings.miles_driver_fallback =
-        GetPrivateProfileIntA("Main", "EnableMilesDriverFallback", 1, ini_path.string().c_str()) != 0;
-    settings.raw_audio_buffered_open =
-        GetPrivateProfileIntA("Main", "EnableRawAudioBufferedOpen", 1, ini_path.string().c_str()) != 0;
-    settings.event_patch =
-        GetPrivateProfileIntA("Main", "EnableEventPatch", 0, ini_path.string().c_str()) != 0;
-    settings.pool_audio_temp_events =
-        GetPrivateProfileIntA("Main", "PoolAudioTempEvents", 0, ini_path.string().c_str()) != 0;
-    settings.log_event_init =
-        GetPrivateProfileIntA("Main", "LogEventPatchInit", 0, ini_path.string().c_str()) != 0;
-    settings.heap_patch =
-        GetPrivateProfileIntA("Main", "EnableHeapPatch", 0, ini_path.string().c_str()) != 0;
+    settings.miles_audio_patch = read_ini_bool("Main", "EnableMilesAudioPatch", true, ini_path);
+    settings.log_audio_init = read_ini_bool("Main", "LogMilesAudioInit", false, ini_path);
+    settings.detect_miles_primary_format = read_ini_bool("Main", "DetectMilesPrimaryFormat", true, ini_path);
+    settings.miles_driver_fallback = read_ini_bool("Main", "EnableMilesDriverFallback", true, ini_path);
+    settings.raw_audio_buffered_open = read_ini_bool("Main", "EnableRawAudioBufferedOpen", true, ini_path);
+    settings.event_patch = read_ini_bool("Main", "EnableEventPatch", false, ini_path);
+    settings.pool_audio_temp_events = read_ini_bool("Main", "PoolAudioTempEvents", false, ini_path);
+    settings.log_event_init = read_ini_bool("Main", "LogEventPatchInit", false, ini_path);
+    settings.heap_patch = read_ini_bool("Main", "EnableHeapPatch", false, ini_path);
     settings.heap_terminate_on_corruption =
-        GetPrivateProfileIntA("Main", "EnableHeapTerminateOnCorruption", 1, ini_path.string().c_str()) != 0;
-    settings.heap_low_fragmentation =
-        GetPrivateProfileIntA("Main", "EnableLowFragmentationHeap", 1, ini_path.string().c_str()) != 0;
-    settings.input_patch =
-        GetPrivateProfileIntA("Main", "EnableInputPatch", 1, ini_path.string().c_str()) != 0;
-    settings.input_auto_reacquire =
-        GetPrivateProfileIntA("Main", "EnableInputAutoReacquire", 1, ini_path.string().c_str()) != 0;
-    settings.raw_mouse_input =
-        GetPrivateProfileIntA("Main", "EnableRawMouseInput", 1, ini_path.string().c_str()) != 0;
-    settings.log_input_init =
-        GetPrivateProfileIntA("Main", "LogInputInit", 0, ini_path.string().c_str()) != 0;
-    settings.version_patch =
-        GetPrivateProfileIntA("Main", "EnableVersionPatch", 1, ini_path.string().c_str()) != 0;
-    settings.directx_probe_patch =
-        GetPrivateProfileIntA("Main", "EnableDirectXProbePatch", 1, ini_path.string().c_str()) != 0;
-    settings.system_parameters_patch =
-        GetPrivateProfileIntA("Main", "EnableSystemParametersPatch", 1, ini_path.string().c_str()) != 0;
-    settings.error_mode_patch =
-        GetPrivateProfileIntA("Main", "EnableErrorModePatch", 1, ini_path.string().c_str()) != 0;
-    settings.qpc_timer_hooks =
-        GetPrivateProfileIntA("Main", "EnableQpcTimerHooks", 1, ini_path.string().c_str()) != 0;
-    settings.qpc_rdtsc_hook =
-        GetPrivateProfileIntA("Main", "EnableQpcRdtscHook", 1, ini_path.string().c_str()) != 0;
-    settings.timing_telemetry =
-        GetPrivateProfileIntA("Main", "EnableTimingTelemetry", 0, ini_path.string().c_str()) != 0;
-    settings.crash_dumps =
-        GetPrivateProfileIntA("Main", "EnableCrashDumps", 1, ini_path.string().c_str()) != 0;
-    settings.full_memory_crash_dumps =
-        GetPrivateProfileIntA("Main", "FullMemoryCrashDumps", 0, ini_path.string().c_str()) != 0;
-    settings.dpi_awareness =
-        GetPrivateProfileIntA("Main", "EnableModernDpiAwareness", 1, ini_path.string().c_str()) != 0;
-    settings.scheduler_precision =
-        GetPrivateProfileIntA("Main", "EnableTimeBeginPeriod", 1, ini_path.string().c_str()) != 0;
-    settings.power_throttling_opt_out =
-        GetPrivateProfileIntA("Main", "EnablePowerThrottlingOptOut", 1, ini_path.string().c_str()) != 0;
-    settings.miles_fallback_rate = static_cast<std::uint32_t>(
-        GetPrivateProfileIntA("Main", "MilesFallbackRate", 48000, ini_path.string().c_str()));
-    settings.miles_fallback_bits =
-        GetPrivateProfileIntA("Main", "MilesFallbackBits", 16, ini_path.string().c_str());
-    settings.miles_fallback_channels =
-        GetPrivateProfileIntA("Main", "MilesFallbackChannels", 2, ini_path.string().c_str());
-    settings.telemetry_flush_interval_ms = static_cast<std::uint32_t>(
-        GetPrivateProfileIntA("Main", "TimingTelemetryFlushMs", 5000, ini_path.string().c_str()));
+        read_ini_bool("Main", "EnableHeapTerminateOnCorruption", true, ini_path);
+    settings.heap_low_fragmentation = read_ini_bool("Main", "EnableLowFragmentationHeap", true, ini_path);
+    settings.input_patch = read_ini_bool("Main", "EnableInputPatch", true, ini_path);
+    settings.input_auto_reacquire = read_ini_bool("Main", "EnableInputAutoReacquire", true, ini_path);
+    settings.raw_mouse_input = read_ini_bool("Main", "EnableRawMouseInput", true, ini_path);
+    settings.log_input_init = read_ini_bool("Main", "LogInputInit", false, ini_path);
+    settings.version_patch = read_ini_bool("Main", "EnableVersionPatch", true, ini_path);
+    settings.directx_probe_patch = read_ini_bool("Main", "EnableDirectXProbePatch", true, ini_path);
+    settings.system_parameters_patch = read_ini_bool("Main", "EnableSystemParametersPatch", true, ini_path);
+    settings.error_mode_patch = read_ini_bool("Main", "EnableErrorModePatch", true, ini_path);
+    settings.qpc_timer_hooks = read_ini_bool("Main", "EnableQpcTimerHooks", true, ini_path);
+    settings.qpc_rdtsc_hook = read_ini_bool("Main", "EnableQpcRdtscHook", true, ini_path);
+    settings.timing_telemetry = read_ini_bool("Main", "EnableTimingTelemetry", false, ini_path);
+    settings.crash_dumps = read_ini_bool("Main", "EnableCrashDumps", true, ini_path);
+    settings.full_memory_crash_dumps = read_ini_bool("Main", "FullMemoryCrashDumps", false, ini_path);
+    settings.dpi_awareness = read_ini_bool("Main", "EnableModernDpiAwareness", true, ini_path);
+    settings.scheduler_precision = read_ini_bool("Main", "EnableTimeBeginPeriod", true, ini_path);
+    settings.power_throttling_opt_out = read_ini_bool("Main", "EnablePowerThrottlingOptOut", true, ini_path);
+    settings.miles_fallback_rate =
+        read_ini_u32_in_range("Main", "MilesFallbackRate", 48000, 8000, 192000, ini_path);
+    settings.miles_fallback_bits = read_ini_audio_bits(ini_path);
+    settings.miles_fallback_channels = read_ini_audio_channels(ini_path);
+    settings.telemetry_flush_interval_ms =
+        read_ini_u32_in_range("Main", "TimingTelemetryFlushMs", 5000, 1, 60000, ini_path);
     char crash_directory_buffer[MAX_PATH] = {};
     GetPrivateProfileStringA(
         "Main",

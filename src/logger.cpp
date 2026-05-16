@@ -43,12 +43,7 @@ std::string timestamp() {
     return buffer;
 }
 
-}  // namespace
-
-namespace mhmodern::logger {
-
-bool initialize() {
-    std::scoped_lock lock(g_log_mutex);
+bool initialize_unlocked() {
     if (g_initialized) {
         return true;
     }
@@ -64,9 +59,18 @@ bool initialize() {
     return true;
 }
 
+}  // namespace
+
+namespace mhmodern::logger {
+
+bool initialize() {
+    std::scoped_lock lock(g_log_mutex);
+    return initialize_unlocked();
+}
+
 void write(const char* format, ...) {
     std::scoped_lock lock(g_log_mutex);
-    if (!g_initialized && !initialize()) {
+    if (!g_initialized && !initialize_unlocked()) {
         return;
     }
 
@@ -86,7 +90,7 @@ void write(const char* format, ...) {
 
 std::string log_path() {
     std::scoped_lock lock(g_log_mutex);
-    if (!g_initialized && !initialize()) {
+    if (!g_initialized && !initialize_unlocked()) {
         return {};
     }
     return g_log_path.string();

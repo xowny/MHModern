@@ -22,7 +22,8 @@ int main() {
     bool ok = true;
 
     ok &= expect_equal("wrapped_elapsed basic", mhmodern::wait_patch::wrapped_elapsed(100, 109), 9);
-    ok &= expect_equal("wrapped_elapsed wrap", mhmodern::wait_patch::wrapped_elapsed(0xfffffff0u, 5u), 20u);
+    ok &= expect_equal("wrapped_elapsed wrap", mhmodern::wait_patch::wrapped_elapsed(0xfffffff0u, 5u), 21u);
+    ok &= expect_equal("wrapped_elapsed single tick wrap", mhmodern::wait_patch::wrapped_elapsed(0xffffffffu, 0u), 1u);
     ok &= expect_equal("remaining_delay none", mhmodern::wait_patch::remaining_delay(10, 15, 5), 0);
     ok &= expect_equal("remaining_delay one", mhmodern::wait_patch::remaining_delay(10, 14, 5), 1);
     ok &= expect_equal("remaining_delay full", mhmodern::wait_patch::remaining_delay(10, 10, 5), 5);

@@ -20,7 +20,7 @@ struct SourceTelemetry {
 };
 
 CRITICAL_SECTION g_lock;
-bool g_lock_initialized = false;
+INIT_ONCE g_lock_init_once = INIT_ONCE_STATIC_INIT;
 bool g_enabled = false;
 std::uint32_t g_flush_interval_ms = 5000;
 std::uint64_t g_last_flush_ms = 0;
@@ -29,11 +29,13 @@ std::array<SourceTelemetry, 2> g_sources{{
     {"GetTickCount", {}, 0, false},
 }};
 
+BOOL CALLBACK initialize_lock_once(PINIT_ONCE, PVOID, PVOID*) {
+    InitializeCriticalSection(&g_lock);
+    return TRUE;
+}
+
 void ensure_initialized() {
-    if (!g_lock_initialized) {
-        InitializeCriticalSection(&g_lock);
-        g_lock_initialized = true;
-    }
+    InitOnceExecuteOnce(&g_lock_init_once, initialize_lock_once, nullptr, nullptr);
 }
 
 SourceTelemetry* find_source(const char* source) {
@@ -78,7 +80,9 @@ void flush_locked(std::uint64_t now_ms) {
         return;
     }
 
-    if (g_last_flush_ms != 0 && now_ms - g_last_flush_ms < g_flush_interval_ms) {
+    if (g_last_flush_ms != 0 &&
+        now_ms >= g_last_flush_ms &&
+        now_ms - g_last_flush_ms < g_flush_interval_ms) {
         return;
     }
 

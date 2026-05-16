@@ -37,6 +37,9 @@ int main() {
             "EnableRawMouseInput=0\n"
             "EnablePowerThrottlingOptOut=0\n"
             "MilesFallbackRate=44100\n"
+            "MilesFallbackBits=24\n"
+            "MilesFallbackChannels=1\n"
+            "TimingTelemetryFlushMs=2500\n"
             "CrashDumpDirectory=CustomDumps\n";
     }
 
@@ -52,8 +55,9 @@ int main() {
     ok &= expect_true("raw mouse override", !settings.raw_mouse_input);
     ok &= expect_true("power throttling opt-out override", !settings.power_throttling_opt_out);
     ok &= expect_true("miles fallback rate override", settings.miles_fallback_rate == 44100u);
-    ok &= expect_true("miles fallback bits default", settings.miles_fallback_bits == 16);
-    ok &= expect_true("miles fallback channels default", settings.miles_fallback_channels == 2);
+    ok &= expect_true("miles fallback bits override", settings.miles_fallback_bits == 24);
+    ok &= expect_true("miles fallback channels override", settings.miles_fallback_channels == 1);
+    ok &= expect_true("telemetry flush override", settings.telemetry_flush_interval_ms == 2500u);
     ok &= expect_true("raw audio buffered open default on", settings.raw_audio_buffered_open);
     ok &= expect_true(
         "power throttling execution-speed mask",
@@ -71,6 +75,26 @@ int main() {
         "power throttling access denied is not unsupported",
         !mhmodern::modern_patch::detail::is_power_throttling_unsupported_error(ERROR_ACCESS_DENIED));
     ok &= expect_eq("crash dump dir override", settings.crash_dump_directory, std::string("CustomDumps"));
+
+    {
+        std::ofstream out(temp_ini, std::ios::trunc);
+        out <<
+            "[Main]\n"
+            "MilesFallbackRate=-1\n"
+            "MilesFallbackBits=12\n"
+            "MilesFallbackChannels=0\n"
+            "TimingTelemetryFlushMs=0\n";
+    }
+
+    const auto sanitized = mhmodern::modern_patch::detail::load_settings_from(temp_ini);
+    ok &= expect_true("miles fallback rate invalid resets to default", sanitized.miles_fallback_rate == 48000u);
+    ok &= expect_true("miles fallback bits invalid reset to default", sanitized.miles_fallback_bits == 16);
+    ok &= expect_true(
+        "miles fallback channels invalid reset to default",
+        sanitized.miles_fallback_channels == 2);
+    ok &= expect_true(
+        "telemetry flush invalid resets to default",
+        sanitized.telemetry_flush_interval_ms == 5000u);
 
     std::error_code ignored;
     std::filesystem::remove(temp_ini, ignored);

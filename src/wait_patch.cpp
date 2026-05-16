@@ -27,16 +27,31 @@ void call_frame_reset_path() {
     reset_b();
 
     auto* context = *reinterpret_cast<void**>(kRenderContextAddress);
-    finalize(context);
+    if (context != nullptr) {
+        finalize(context);
+    }
     *reinterpret_cast<std::uint8_t*>(kFlagAddress) = 0;
 }
 
-std::uint32_t query_game_timer() {
+bool query_game_timer(std::uint32_t& current_time) {
     auto* owner = *reinterpret_cast<void**>(kTimerBaseAddress);
+    if (owner == nullptr) {
+        return false;
+    }
+
     auto* timer = *reinterpret_cast<void**>(reinterpret_cast<std::uint8_t*>(owner) + 0x0c);
+    if (timer == nullptr) {
+        return false;
+    }
+
     auto** vtable = *reinterpret_cast<void***>(timer);
+    if (vtable == nullptr || vtable[7] == nullptr) {
+        return false;
+    }
+
     auto fn = reinterpret_cast<ThiscallTimeFn>(vtable[7]);
-    return fn(timer);
+    current_time = fn(timer);
+    return true;
 }
 
 void precise_wait_until_ready() {
@@ -45,9 +60,15 @@ void precise_wait_until_ready() {
 
     constexpr auto minimum_step = 5u;
     for (;;) {
+        std::uint32_t current_time = 0;
+        if (!query_game_timer(current_time)) {
+            *reinterpret_cast<std::uint32_t*>(kPreviousDeltaAddress) = 0;
+            return;
+        }
+
         const auto current_delta = mhmodern::wait_patch::wrapped_elapsed(
             *reinterpret_cast<std::uint32_t*>(kTimerOriginAddress),
-            query_game_timer());
+            current_time);
         const auto previous_delta = *reinterpret_cast<std::uint32_t*>(kPreviousDeltaAddress);
         const auto remaining = mhmodern::wait_patch::remaining_delay(previous_delta, current_delta, minimum_step);
         if (remaining == 0) {
@@ -68,7 +89,7 @@ void precise_wait_until_ready() {
 namespace mhmodern::wait_patch {
 
 std::uint32_t wrapped_elapsed(std::uint32_t base, std::uint32_t now) {
-    return now >= base ? now - base : now + (0xffffffffu - base);
+    return now >= base ? now - base : now + (0xffffffffu - base) + 1u;
 }
 
 std::uint32_t remaining_delay(std::uint32_t previous_delta, std::uint32_t current_delta, std::uint32_t minimum_step) {

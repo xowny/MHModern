@@ -19,7 +19,7 @@ constexpr char kRawSfxPath[] = "AUDIO\\PC\\SFX\\SFX.RAW";
 
 std::optional<DriverOpenAttempt> query_default_device_format() {
     HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
-    const bool uninitialize_com = SUCCEEDED(hr);
+    const bool uninitialize_com = hr == S_OK;
     if (FAILED(hr) && hr != RPC_E_CHANGED_MODE) {
         return std::nullopt;
     }
