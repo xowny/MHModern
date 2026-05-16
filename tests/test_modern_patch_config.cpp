@@ -1,5 +1,7 @@
 #include "../src/modern_patch_internal.h"
 
+#include <windows.h>
+
 #include <fstream>
 #include <filesystem>
 #include <iostream>
@@ -32,6 +34,8 @@ int main() {
             "[Main]\n"
             "DetectMilesPrimaryFormat=0\n"
             "EnableEventPatch=1\n"
+            "EnableRawMouseInput=0\n"
+            "EnablePowerThrottlingOptOut=0\n"
             "MilesFallbackRate=44100\n"
             "CrashDumpDirectory=CustomDumps\n";
     }
@@ -45,10 +49,27 @@ int main() {
     ok &= expect_true("pool audio temp events default off", !settings.pool_audio_temp_events);
     ok &= expect_true("heap patch default off", !settings.heap_patch);
     ok &= expect_true("heap terminate on corruption default on", settings.heap_terminate_on_corruption);
+    ok &= expect_true("raw mouse override", !settings.raw_mouse_input);
+    ok &= expect_true("power throttling opt-out override", !settings.power_throttling_opt_out);
     ok &= expect_true("miles fallback rate override", settings.miles_fallback_rate == 44100u);
     ok &= expect_true("miles fallback bits default", settings.miles_fallback_bits == 16);
     ok &= expect_true("miles fallback channels default", settings.miles_fallback_channels == 2);
     ok &= expect_true("raw audio buffered open default on", settings.raw_audio_buffered_open);
+    ok &= expect_true(
+        "power throttling execution-speed mask",
+        mhmodern::modern_patch::detail::execution_speed_throttling_mask(true) == 1u);
+    ok &= expect_true(
+        "power throttling mask clears when disabled",
+        mhmodern::modern_patch::detail::execution_speed_throttling_mask(false) == 0u);
+    ok &= expect_true(
+        "power throttling invalid function is unsupported",
+        mhmodern::modern_patch::detail::is_power_throttling_unsupported_error(ERROR_INVALID_FUNCTION));
+    ok &= expect_true(
+        "power throttling not supported is unsupported",
+        mhmodern::modern_patch::detail::is_power_throttling_unsupported_error(ERROR_NOT_SUPPORTED));
+    ok &= expect_true(
+        "power throttling access denied is not unsupported",
+        !mhmodern::modern_patch::detail::is_power_throttling_unsupported_error(ERROR_ACCESS_DENIED));
     ok &= expect_eq("crash dump dir override", settings.crash_dump_directory, std::string("CustomDumps"));
 
     std::error_code ignored;

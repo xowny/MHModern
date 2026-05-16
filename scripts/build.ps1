@@ -190,7 +190,7 @@ if ($Target -eq 'test') {
         (Join-Path $srcDir 'iat_patch.cpp'),
         (Join-Path $srcDir 'input_patch.cpp')
     ) | ForEach-Object { "`"$_`"" }
-    $compileInputPatch = "cl $commonFlags /Fe`"$testInputPatchOutput`" $($testInputPatchSources -join ' ') dinput8.lib dxguid.lib"
+    $compileInputPatch = "cl $commonFlags /Fe`"$testInputPatchOutput`" $($testInputPatchSources -join ' ') user32.lib dinput8.lib dxguid.lib"
     Invoke-MsvcBuild -CommandLine $compileInputPatch
     & $testInputPatchOutput
     if ($LASTEXITCODE -ne 0) {

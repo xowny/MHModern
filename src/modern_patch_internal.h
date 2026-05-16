@@ -1,7 +1,7 @@
 #pragma once
 
-#include <filesystem>
 #include <cstdint>
+#include <filesystem>
 #include <string>
 
 namespace mhmodern::modern_patch::detail {
@@ -20,6 +20,7 @@ struct Settings {
     bool heap_low_fragmentation = true;
     bool input_patch = true;
     bool input_auto_reacquire = true;
+    bool raw_mouse_input = true;
     bool log_input_init = false;
     bool version_patch = true;
     bool directx_probe_patch = true;
@@ -32,12 +33,24 @@ struct Settings {
     bool full_memory_crash_dumps = false;
     bool dpi_awareness = true;
     bool scheduler_precision = true;
+    bool power_throttling_opt_out = true;
     std::uint32_t miles_fallback_rate = 48000;
     std::int32_t miles_fallback_bits = 16;
     std::int32_t miles_fallback_channels = 2;
     std::uint32_t telemetry_flush_interval_ms = 5000;
     std::string crash_dump_directory = "MHModern_crashes";
 };
+
+enum class PowerThrottlingOptOutResult {
+    Applied,
+    ApiUnavailable,
+    Unsupported,
+    Failed,
+};
+
+std::uint32_t execution_speed_throttling_mask(bool disable_power_throttling);
+bool is_power_throttling_unsupported_error(std::uint32_t error_code);
+PowerThrottlingOptOutResult apply_power_throttling_opt_out();
 
 Settings load_settings_from(const std::filesystem::path& ini_path);
 Settings load_settings();

@@ -4,7 +4,7 @@
 
 ## NexusMods Description
 
-MHModern is a compatibility patch for the original Manhunt 1 PC release. It focuses on startup stability and modern Windows compatibility. It fixes Miles startup and fallback audio, buffered `SFX.RAW` opens, DirectInput reacquire, version checks, the old DirectX probe, global Windows setting writes, error-mode shutdown behavior, timer and busy-wait behavior, crash dumps, DPI awareness, and scheduler precision.
+MHModern is compatibility patch for the original Manhunt 1 PC release. It focuses on startup stability and modern Windows compatibility. It fixes Miles startup and fallback audio, buffered `SFX.RAW` opens, DirectInput reacquire, optional raw mouse input, version checks, the old DirectX probe, global Windows setting writes, error-mode shutdown behavior, timer and busy-wait behavior, crash dumps, DPI awareness, scheduler precision, and process power-throttling opt-out.
 
 ## Build
 
@@ -51,11 +51,12 @@ On launch, the plugin writes `MHModern.log` in the game directory. Confirm:
 - the raw `SFX.RAW` buffered-open shim installed if it was enabled
 - the optional event patch is disabled for the release baseline unless explicitly enabled for testing
 - the heap patch is disabled for the release baseline unless explicitly enabled for testing
-- the input patch installed, and DirectInput auto-reacquire is enabled if desired
+- the input patch installed, and DirectInput auto-reacquire and raw mouse input are enabled if desired
 - the version patch installed so legacy OS checks see the real Windows version
 - the DirectX probe patch installed so the old `dpnhpast.dll` gate is bypassed cleanly
 - the system-parameters patch installed so startup no longer toggles global screensaver, power, sticky-key, or foreground-lock settings
 - the error-mode patch installed so shutdown restores the prior process error mode instead of forcing zero
+- the process power-throttling opt-out applied cleanly or logged that the Windows API was unavailable
 - DPI awareness enabled or fell back cleanly
 - `timeGetTime`, `GetTickCount`, and pointer-probe imports were patched in `manhunt.exe`
 - the internal `rdtsc` helper and wait routine patches were applied
@@ -73,7 +74,9 @@ The follow-up event pass is also narrow. Ghidra analysis showed the main `SFX.RA
 
 The heap pass is intentionally conservative, but it is no longer considered release-safe for Manhunt 1. In practice it can interfere with Miles startup on this game, so `MHModern.asi` now skips heap hardening automatically whenever the Miles audio patch is enabled, and the shipped INI leaves `EnableHeapPatch=0` by default.
 
-The input pass is intentionally narrow. It does not replace DirectInput with Raw Input. It wraps `DirectInput8Create` so device-state reads can reacquire the device automatically after common focus-loss errors such as `DIERR_INPUTLOST` and `DIERR_NOTACQUIRED`.
+The input pass is still intentionally narrow, but it is no longer limited to reacquire-only behavior. `MHModern.asi` wraps `DirectInput8Create` so device-state reads can reacquire the device automatically after common focus-loss errors such as `DIERR_INPUTLOST` and `DIERR_NOTACQUIRED`. When `EnableRawMouseInput=1`, the same wrapper also registers `WM_INPUT` on the game window and substitutes raw relative mouse deltas back into the DirectInput mouse state. This keeps the original DirectInput path intact while bypassing legacy Windows mouse acceleration and filtering for camera look.
+
+The process-power pass is similarly narrow. When `EnablePowerThrottlingOptOut=1`, `MHModern.asi` calls `SetProcessInformation(ProcessPowerThrottling)` if the host OS exposes that API, so Windows does not apply execution-speed throttling to the game process. If the API is missing or unsupported, the plugin logs that and continues without failing startup.
 
 The version pass is deliberately simple. `manhunt.exe` still imports `GetVersion`, which can return compatibility-limited results on modern Windows. `MHModern.asi` replaces that import with a `RtlGetVersion`-backed result so any old OS checks see the actual host version instead of a manifest-limited lie.
 

@@ -11,6 +11,17 @@ namespace {
 using SetProcessDpiAwarenessContextFn = BOOL(WINAPI*)(HANDLE);
 using SetProcessDpiAwarenessFn = HRESULT(WINAPI*)(PROCESS_DPI_AWARENESS);
 using TimeBeginPeriodFn = MMRESULT(WINAPI*)(UINT);
+using SetProcessInformationFn = BOOL(WINAPI*)(HANDLE, int, LPVOID, DWORD);
+
+constexpr ULONG kProcessPowerThrottlingCurrentVersion = 1;
+constexpr ULONG kProcessPowerThrottlingExecutionSpeed = 0x1;
+constexpr int kProcessPowerThrottlingInformationClass = 4;
+
+struct PowerThrottlingStateCompat {
+    ULONG Version;
+    ULONG ControlMask;
+    ULONG StateMask;
+};
 
 std::filesystem::path exe_directory() {
     char buffer[MAX_PATH] = {};
@@ -54,6 +65,8 @@ Settings load_settings_from(const std::filesystem::path& ini_path) {
         GetPrivateProfileIntA("Main", "EnableInputPatch", 1, ini_path.string().c_str()) != 0;
     settings.input_auto_reacquire =
         GetPrivateProfileIntA("Main", "EnableInputAutoReacquire", 1, ini_path.string().c_str()) != 0;
+    settings.raw_mouse_input =
+        GetPrivateProfileIntA("Main", "EnableRawMouseInput", 1, ini_path.string().c_str()) != 0;
     settings.log_input_init =
         GetPrivateProfileIntA("Main", "LogInputInit", 0, ini_path.string().c_str()) != 0;
     settings.version_patch =
@@ -78,6 +91,8 @@ Settings load_settings_from(const std::filesystem::path& ini_path) {
         GetPrivateProfileIntA("Main", "EnableModernDpiAwareness", 1, ini_path.string().c_str()) != 0;
     settings.scheduler_precision =
         GetPrivateProfileIntA("Main", "EnableTimeBeginPeriod", 1, ini_path.string().c_str()) != 0;
+    settings.power_throttling_opt_out =
+        GetPrivateProfileIntA("Main", "EnablePowerThrottlingOptOut", 1, ini_path.string().c_str()) != 0;
     settings.miles_fallback_rate = static_cast<std::uint32_t>(
         GetPrivateProfileIntA("Main", "MilesFallbackRate", 48000, ini_path.string().c_str()));
     settings.miles_fallback_bits =
@@ -125,6 +140,45 @@ bool enable_dpi_awareness() {
     }
 
     return SetProcessDPIAware() == TRUE;
+}
+
+std::uint32_t execution_speed_throttling_mask(bool disable_power_throttling) {
+    return disable_power_throttling ? kProcessPowerThrottlingExecutionSpeed : 0U;
+}
+
+bool is_power_throttling_unsupported_error(std::uint32_t error_code) {
+    return error_code == ERROR_INVALID_FUNCTION || error_code == ERROR_NOT_SUPPORTED;
+}
+
+PowerThrottlingOptOutResult apply_power_throttling_opt_out() {
+    HMODULE kernel32 = GetModuleHandleA("kernel32.dll");
+    if (kernel32 == nullptr) {
+        return PowerThrottlingOptOutResult::ApiUnavailable;
+    }
+
+    auto set_process_information = reinterpret_cast<SetProcessInformationFn>(
+        GetProcAddress(kernel32, "SetProcessInformation"));
+    if (set_process_information == nullptr) {
+        return PowerThrottlingOptOutResult::ApiUnavailable;
+    }
+
+    PowerThrottlingStateCompat state{};
+    state.Version = kProcessPowerThrottlingCurrentVersion;
+    state.ControlMask = execution_speed_throttling_mask(true);
+    state.StateMask = 0;
+    if (!set_process_information(
+            GetCurrentProcess(),
+            kProcessPowerThrottlingInformationClass,
+            &state,
+            sizeof(state))) {
+        const auto error = static_cast<std::uint32_t>(GetLastError());
+        if (is_power_throttling_unsupported_error(error)) {
+            return PowerThrottlingOptOutResult::Unsupported;
+        }
+        return PowerThrottlingOptOutResult::Failed;
+    }
+
+    return PowerThrottlingOptOutResult::Applied;
 }
 
 unsigned tighten_scheduler_precision() {

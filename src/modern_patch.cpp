@@ -190,7 +190,7 @@ DWORD WINAPI initialize_mod(HMODULE module_handle) {
     logger::write("MHModern bootstrap starting");
 
     const modern_patch::detail::Settings settings = modern_patch::detail::load_settings();
-    logger::write("Settings: MilesAudioPatch=%d LogMilesAudioInit=%d DetectMilesPrimaryFormat=%d MilesDriverFallback=%d RawAudioBufferedOpen=%d EventPatch=%d PoolAudioTempEvents=%d LogEventPatchInit=%d HeapPatch=%d HeapTerminateOnCorruption=%d LowFragmentationHeap=%d InputPatch=%d InputAutoReacquire=%d LogInputInit=%d VersionPatch=%d DirectXProbePatch=%d SystemParametersPatch=%d ErrorModePatch=%d QpcTimer=%d QpcRdtsc=%d TimingTelemetry=%d CrashDumps=%d FullMemoryCrashDumps=%d DpiAwareness=%d TimeBeginPeriod=%d FlushMs=%u",
+    logger::write("Settings: MilesAudioPatch=%d LogMilesAudioInit=%d DetectMilesPrimaryFormat=%d MilesDriverFallback=%d RawAudioBufferedOpen=%d EventPatch=%d PoolAudioTempEvents=%d LogEventPatchInit=%d HeapPatch=%d HeapTerminateOnCorruption=%d LowFragmentationHeap=%d InputPatch=%d InputAutoReacquire=%d RawMouseInput=%d LogInputInit=%d VersionPatch=%d DirectXProbePatch=%d SystemParametersPatch=%d ErrorModePatch=%d QpcTimer=%d QpcRdtsc=%d TimingTelemetry=%d CrashDumps=%d FullMemoryCrashDumps=%d DpiAwareness=%d TimeBeginPeriod=%d PowerThrottlingOptOut=%d FlushMs=%u",
                   settings.miles_audio_patch ? 1 : 0,
                   settings.log_audio_init ? 1 : 0,
                   settings.detect_miles_primary_format ? 1 : 0,
@@ -204,6 +204,7 @@ DWORD WINAPI initialize_mod(HMODULE module_handle) {
                   settings.heap_low_fragmentation ? 1 : 0,
                   settings.input_patch ? 1 : 0,
                   settings.input_auto_reacquire ? 1 : 0,
+                  settings.raw_mouse_input ? 1 : 0,
                   settings.log_input_init ? 1 : 0,
                   settings.version_patch ? 1 : 0,
                   settings.directx_probe_patch ? 1 : 0,
@@ -216,6 +217,7 @@ DWORD WINAPI initialize_mod(HMODULE module_handle) {
                   settings.full_memory_crash_dumps ? 1 : 0,
                   settings.dpi_awareness ? 1 : 0,
                   settings.scheduler_precision ? 1 : 0,
+                  settings.power_throttling_opt_out ? 1 : 0,
                   settings.telemetry_flush_interval_ms);
 
     telemetry::configure(settings.timing_telemetry, settings.telemetry_flush_interval_ms);
@@ -259,6 +261,7 @@ DWORD WINAPI initialize_mod(HMODULE module_handle) {
         input_patch::install({
             settings.input_patch,
             settings.input_auto_reacquire,
+            settings.raw_mouse_input,
             settings.log_input_init,
         });
     }
@@ -281,6 +284,25 @@ DWORD WINAPI initialize_mod(HMODULE module_handle) {
         error_mode_patch::install({
             settings.error_mode_patch,
         });
+    }
+
+    if (settings.power_throttling_opt_out) {
+        switch (modern_patch::detail::apply_power_throttling_opt_out()) {
+        case modern_patch::detail::PowerThrottlingOptOutResult::Applied:
+            logger::write("Power throttling opt-out applied");
+            break;
+        case modern_patch::detail::PowerThrottlingOptOutResult::ApiUnavailable:
+            logger::write("Power throttling opt-out skipped: SetProcessInformation unavailable");
+            break;
+        case modern_patch::detail::PowerThrottlingOptOutResult::Unsupported:
+            logger::write("Power throttling opt-out skipped: unsupported on this platform");
+            break;
+        case modern_patch::detail::PowerThrottlingOptOutResult::Failed:
+            logger::write(
+                "Power throttling opt-out failed: gle=%lu",
+                static_cast<unsigned long>(GetLastError()));
+            break;
+        }
     }
 
     if (settings.dpi_awareness) {
