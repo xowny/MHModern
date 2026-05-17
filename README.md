@@ -1,10 +1,8 @@
 # MHModern
 
-`MHModern.asi` is a conservative Manhunt 1 modernization plugin for the original PC release. It focuses on startup stability and modern Windows compatibility.
+MHModern is a Manhunt 1 modernization plugin for the original PC release. It focuses on startup stability and modern Windows compatibility.
 
-## NexusMods Description
-
-MHModern is compatibility patch for the original Manhunt 1 PC release. It focuses on startup stability and modern Windows compatibility. It fixes Miles startup and fallback audio, buffered `SFX.RAW` opens, DirectInput reacquire, optional raw mouse input, version checks, the old DirectX probe, global Windows setting writes, error-mode shutdown behavior, timer and busy-wait behavior, crash dumps, DPI awareness, scheduler precision, and process power-throttling opt-out.
+Nexus Mods: https://www.nexusmods.com/manhunt/mods/52
 
 ## Build
 
