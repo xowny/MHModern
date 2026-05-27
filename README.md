@@ -1,7 +1,7 @@
 # MHModern
 
 MHModern is a Manhunt 1 modernization plugin for the original PC release. It focuses on startup stability and modern Windows compatibility.
-
+![image alt](https://github.com/xowny/MHModern/blob/main/BQfsKcw.png?raw=true)
 Nexus Mods: https://www.nexusmods.com/manhunt/mods/52
 
 ## Build
